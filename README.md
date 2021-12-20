@@ -46,3 +46,4 @@ sudoku = np.matrix(
 solve_sudoku(sudoku)
 plot_sudoku(sudoku)
 ```
+![image](https://user-images.githubusercontent.com/13164166/146836989-825a2047-7b78-4b4f-b620-ef16e5f10a8e.png)
