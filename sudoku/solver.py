@@ -1,78 +1,84 @@
 #!/usr/bin/env python
 
-import numpy as np
+from collections.abc import Iterator
 from itertools import product
 
+import numpy as np
 
-num_tries = 0
+BLOCK_SIZE = 3  # 2 is a 4x4 with 2x2 blocks, 3 is a 9x9 with 3x3 blocks
 sudoku = np.matrix(
     [
-        [5, 3, 0, 0, 7, 0, 0, 0, 0],
-        [6, 0, 0, 1, 9, 5, 0, 0, 0],
-        [0, 9, 8, 0, 0, 0, 0, 6, 0],
-        [8, 0, 0, 0, 6, 0, 0, 0, 3],
-        [4, 0, 0, 8, 0, 3, 0, 0, 1],
-        [7, 0, 0, 0, 2, 0, 0, 0, 6],
-        [0, 6, 0, 0, 0, 0, 2, 8, 0],
-        [0, 0, 0, 4, 1, 9, 0, 0, 5],
-        [0, 0, 0, 0, 8, 0, 0, 7, 9],
+        [0, 0, 9, 0, 2, 8, 0, 6, 7],
+        [4, 0, 0, 0, 9, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 3],
+        [5, 0, 0, 7, 0, 0, 0, 2, 6],
+        [0, 0, 6, 0, 0, 0, 3, 0, 0],
+        [0, 0, 0, 0, 0, 2, 4, 0, 0],
+        [0, 0, 0, 0, 0, 0, 2, 0, 0],
+        [0, 1, 0, 5, 0, 0, 0, 0, 0],
+        [0, 0, 4, 0, 0, 7, 0, 8, 0],
     ]
 )
 
 
-def check_if_possible(sudoku: np.matrix, x: int, y: int, n: int):
-    global num_tries
-    num_tries += 1
-    # print(f"Trying {y = }, {x = }, {n = }")
-
-    if (sudoku[:, x] == n).any():
+def is_possible(sudoku: np.matrix, row: int, col: int, n: int) -> bool:
+    if (sudoku[row, :] == n).any():
         return False
 
-    if (sudoku[y, :] == n).any():
+    if (sudoku[:, col] == n).any():
         return False
 
-    x0 = (x // 3) * 3
-    y0 = (y // 3) * 3
-    if (sudoku[y0 : y0 + 3, x0 : x0 + 3] == n).any():
+    row0 = (row // BLOCK_SIZE) * BLOCK_SIZE
+    col0 = (col // BLOCK_SIZE) * BLOCK_SIZE
+    if (sudoku[row0 : row0 + BLOCK_SIZE, col0 : col0 + BLOCK_SIZE] == n).any():
         return False
 
     return True
 
 
-def solve_sudoku(sudoku: np.matrix):
-    """Solve the input sudoku puzzle recursively by guessing a number and then trying to solve the remaining puzzle.
+def solutions(
+    sudoku: np.matrix, constrained: np.matrix, prior_position: tuple[int, int] = (0, -1)
+) -> Iterator[np.matrix]:
+    """All solutions to the input sudoku puzzle.
+
+    The sudoku is solved by guessing a valid value for the first empty value, then recursively trying the rest of the sudoku,
+    backtracking on dead ends. Every time a valid solution is found, it is yielded.
 
     N.B.: To avoid copying data each time a new recursion level is entered, the input sudoku is solved in-place.
     """
-    for y, x in product(range(9), range(9)):
-        if sudoku[y, x] != 0:
-            # Number already placed
+    for row, col in product(range(prior_position[0], BLOCK_SIZE**2), range(BLOCK_SIZE**2)):
+        if constrained[row, col]:
+            # Skip prior constrained positions, as these values are locked
             continue
 
-        for n in range(1, 10):
-            if check_if_possible(sudoku, x=x, y=y, n=n):
-                # Try solving sudoku, now with `n` at position [y, x]
-                sudoku[y, x] = n
-                solved = solve_sudoku(sudoku)
+        if row < prior_position[0] or (row == prior_position[0] and col <= prior_position[1]):
+            # Skip all "lower" positions
+            continue
 
-                if solved:
-                    # If the sudoku is solved, return True
-                    return True
+        for n in range(1, BLOCK_SIZE**2 + 1):
+            if not is_possible(sudoku, row=row, col=col, n=n):
+                continue
 
-                # If the sudoku was not solved, reset the number at [y, x]
-                sudoku[y, x] = 0
+            sudoku[row, col] = n
+
+            if (sudoku != 0).all():
+                # Yield the current solution, then reset current position
+                yield sudoku.copy()
+                sudoku[row, col] = 0
+                return
+            else:
+                # Continue to search for solutions from next position
+                yield from solutions(sudoku=sudoku, constrained=constrained, prior_position=(row, col))
+
         else:
-            # If there are no more options to try at the position, it's because an earlier number is wrong.
-            # Return False
-            return False
-
-    # When all x and y are exhausted, the sudoku has been solved
-    return True
+            # Went through all 9 options, and there are no more solutions. Reset current position and go back one
+            sudoku[row, col] = 0
+            return
 
 
 if __name__ == "__main__":
-    solved = solve_sudoku(sudoku)
-    print()
-    print(sudoku)
-    print()
-    print(num_tries)
+    all_solutions = []
+    for i, solution in enumerate(solutions(sudoku=sudoku.copy(), constrained=sudoku != 0)):
+        all_solutions.append(solution)
+        print(i)
+        print(solution)

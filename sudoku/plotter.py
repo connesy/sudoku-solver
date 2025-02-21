@@ -2,6 +2,10 @@
 
 from itertools import product
 
+import matplotlib as mpl
+
+mpl.use("TkAgg")
+
 import matplotlib.pyplot as plt
 
 
@@ -40,8 +44,8 @@ def plot_sudoku(sudoku):
 
 
 if __name__ == "__main__":
-    from solver import sudoku, solve_sudoku
+    from solver import solutions, sudoku
 
     plot_sudoku(sudoku=sudoku)
-    solve_sudoku(sudoku)
+    solution = next(solutions(sudoku, constrained=sudoku != 0))
     plot_sudoku(sudoku=sudoku)
